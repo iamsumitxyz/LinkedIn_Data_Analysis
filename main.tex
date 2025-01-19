@@ -1,0 +1,239 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{float}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{LinkedIn Data Analysis: IIT Graduates Career Paths}
+\author{Data Analytics Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document outlines our comprehensive approach to analyzing IIT graduates' career paths using LinkedIn data. The analysis includes data collection methodology, insights generation, and implementation approach.
+
+\section{Data Collection Implementation}
+Below is the Python implementation for collecting LinkedIn data:
+
+\begin{lstlisting}[language=Python]
+import os
+from linkedin_api import Linkedin
+import pandas as pd
+from time import sleep
+from datetime import datetime
+import logging
+
+class LinkedInDataCollector:
+    def __init__(self, client_id, client_secret):
+        self.logger = self._setup_logging()
+        self.api = None
+        self.client_id = client_id
+        self.client_secret = client_secret
+        
+    def _setup_logging(self):
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('linkedin_scraper.log'),
+                logging.StreamHandler()
+            ]
+        )
+        return logging.getLogger(__name__)
+
+    def authenticate(self):
+        """Authenticate with LinkedIn using OAuth2"""
+        try:
+            self.api = Linkedin(self.client_id, self.client_secret)
+            self.logger.info("Successfully authenticated with LinkedIn API")
+        except Exception as e:
+            self.logger.error(f"Authentication failed: {str(e)}")
+            raise
+
+    def search_profiles(self, keywords, limit=100):
+        """Search for profiles matching specific keywords"""
+        profiles = []
+        try:
+            search_results = self.api.search_people(
+                keywords=keywords,
+                limit=limit
+            )
+            
+            for profile in search_results:
+                profile_data = {
+                    'profile_id': profile.get('public_id'),
+                    'name': profile.get('full_name'),
+                    'headline': profile.get('headline'),
+                    'company': profile.get('current_company'),
+                    'industry': profile.get('industry'),
+                    'location': profile.get('location'),
+                    'education': self._extract_education(profile)
+                }
+                
+                if self._is_iit_graduate(profile_data['education']):
+                    profiles.append(profile_data)
+                
+                # Respect rate limits
+                sleep(1)
+                
+        except Exception as e:
+            self.logger.error(f"Error during profile search: {str(e)}")
+            
+        return profiles
+
+    def _is_iit_graduate(self, education):
+        """Check if the profile is from an IIT"""
+        if not education:
+            return False
+            
+        iit_keywords = ['indian institute of technology', 'iit']
+        return any(any(keyword in str(edu).lower() for keyword in iit_keywords) 
+                  for edu in education)
+
+    def _extract_education(self, profile):
+        """Extract education details from profile"""
+        education = []
+        if 'education' in profile:
+            for edu in profile['education']:
+                education.append({
+                    'school': edu.get('school_name'),
+                    'degree': edu.get('degree_name'),
+                    'field': edu.get('field_of_study'),
+                    'year': edu.get('end_date', {}).get('year')
+                })
+        return education
+
+    def save_to_csv(self, profiles, filename=None):
+        """Save collected data to CSV"""
+        if not filename:
+            filename = f'linkedin_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            
+        try:
+            df = pd.DataFrame(profiles)
+            df.to_csv(filename, index=False)
+            self.logger.info(f"Data successfully saved to {filename}")
+        except Exception as e:
+            self.logger.error(f"Error saving data to CSV: {str(e)}")
+def main():
+    # Replace with LinkedIn API credentials
+    CLIENT_ID = "client_id"
+    CLIENT_SECRET = "client_secret"
+    
+    collector = LinkedInDataCollector(CLIENT_ID, CLIENT_SECRET)
+    
+    try:
+        # Authenticate
+        collector.authenticate()
+        
+        # Search for IIT graduates
+        profiles = collector.search_profiles(
+            keywords="IIT graduate",
+            limit=100
+        )
+        
+        # Save results
+        collector.save_to_csv(profiles)
+        
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\section{Data Analysis Methodology(Bonus)}
+The collected data will be analyzed to generate the following insights:
+
+\subsection{Career Trajectory Analysis}
+\begin{itemize}
+    \item Track progression patterns between job titles
+    \item Identify typical duration at each career level
+    \item Analyze paths leading to leadership positions
+    \item Map industry transition patterns
+\end{itemize}
+
+\subsection{Industry Patterns}
+\begin{itemize}
+    \item Determine dominant sectors for IIT graduates
+    \item Correlate specializations with industry choices
+    \item Identify emerging industry trends
+    \item Calculate industry retention rates
+\end{itemize}
+
+\subsection{Company Analysis}
+\begin{itemize}
+    \item Compare startup vs. established company preferences
+    \item Analyze company size transitions
+    \item Identify companies with best retention rates
+    \item Map career growth patterns by company type
+\end{itemize}
+
+\section{Implementation Approach}
+Our implementation follows these key principles:
+
+\subsection{Architecture}
+\begin{itemize}
+    \item Object-oriented design for maintainability
+    \item Comprehensive error handling and logging
+    \item Rate limiting for API compliance
+    \item Scalable data processing
+\end{itemize}
+
+\subsection{Key Features}
+\begin{itemize}
+    \item Secure OAuth2 authentication
+    \item Efficient profile searching
+    \item Structured data extraction
+    \item Education verification
+    \item CSV export functionality
+\end{itemize}
+
+\subsection{Safety \& Compliance}
+\begin{itemize}
+    \item API-based access
+    \item Built-in rate limiting
+    \item Error logging system
+    \item Terms of service compliance
+    \item Secure credential management
+\end{itemize}
+
+\subsection{Data Quality}
+\begin{itemize}
+    \item Structured collection methods
+    \item Missing data handling
+    \item Education validation
+    \item Consistent formatting
+\end{itemize}
+
+\end{document}
